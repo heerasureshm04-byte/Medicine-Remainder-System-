@@ -1,57 +1,105 @@
 #include <Wire.h>
 #include <RTClib.h>
 #include <LiquidCrystal_I2C.h>
-#include <Servo.h>
 
 RTC_DS3231 rtc;
 LiquidCrystal_I2C lcd(0x27, 16, 2);
-Servo myServo;
 
-// ON/OFF times (24-hour format)
-int onHour = 11;   // 2 PM
-int offHour = 12;  // 6 PM
+// Pin definitions
+const int buzzer = 8;
+const int button = 2;
+
+// First reminder time
+const int reminderHour = 4;
+const int reminderMinute = 45;
+
+bool firstReminderDone = false;
+bool alarmOn = false;
+
+unsigned long lastReminderTime = 0;
+const unsigned long interval = 30000; // 30 seconds
 
 void setup() {
-  Wire.begin();          
-  rtc.begin();
+  pinMode(buzzer, OUTPUT);
+  pinMode(button, INPUT_PULLUP);
+
+  digitalWrite(buzzer, LOW);
+
+  Wire.begin();
   lcd.init();
   lcd.backlight();
-  
-  myServo.attach(9);     
-  myServo.write(0);      // Start OFF
-  
-  // Uncomment to set RTC time to compile time
-  // rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));
-  Serial.begin(9600);
+
+  if (!rtc.begin()) {
+    lcd.setCursor(0, 0);
+    lcd.print("RTC ERROR");
+    while (1);
+  }
+
+  // Upload ONCE to set RTC to 04:45:00
+  rtc.adjust(DateTime(2026, 7, 9, 4, 45, 0));
+
+  lcd.clear();
 }
 
 void loop() {
+
   DateTime now = rtc.now();
 
-  // Display time
+  // Display current time
   lcd.setCursor(0, 0);
-  lcd.print("Time: ");
-  Serial.println("time:");
+  lcd.print("Time:");
   if (now.hour() < 10) lcd.print("0");
   lcd.print(now.hour());
-   Serial.println(now.hour());
   lcd.print(":");
-  Serial.println(':');
   if (now.minute() < 10) lcd.print("0");
   lcd.print(now.minute());
-  Serial.println(now.minute());
-  // Check if current time is between ON and OFF hours
-  if (now.hour() >= onHour && now.hour() < offHour) {
-    myServo.write(90); // ON position
+  lcd.print(":");
+  if (now.second() < 10) lcd.print("0");
+  lcd.print(now.second());
+  lcd.print(" ");
+
+  // First reminder at 04:45
+  if (!firstReminderDone &&
+      now.hour() == reminderHour &&
+      now.minute() == reminderMinute &&
+      !alarmOn) {
+
+    alarmOn = true;
+    digitalWrite(buzzer, HIGH);
+
     lcd.setCursor(0, 1);
-    lcd.print("Switch: ON ");
-    Serial.println("Switch: ON ");
-  } else {
-    myServo.write(0); // OFF position
-    lcd.setCursor(0, 1);
-    lcd.print("Switch: OFF");
-    Serial.println("Switch: OFF");
+    lcd.print("Take Medicine ");
   }
 
-  delay(1000);
+  // Next reminder every 30 seconds after button press
+  if (firstReminderDone &&
+      !alarmOn &&
+      millis() - lastReminderTime >= interval) {
+
+    alarmOn = true;
+    digitalWrite(buzzer, HIGH);
+
+    lcd.setCursor(0, 1);
+    lcd.print("Take Medicine ");
+  }
+
+  // Button pressed
+  if (alarmOn && digitalRead(button) == LOW) {
+
+    digitalWrite(buzzer, LOW);
+    alarmOn = false;
+
+    firstReminderDone = true;
+    lastReminderTime = millis();
+
+    lcd.setCursor(0, 1);
+    lcd.print("Medicine Taken");
+
+    delay(1500);
+
+    lcd.setCursor(0, 1);
+    lcd.print("Next:30 Seconds");
+  }
+
+  delay(200);
 }
