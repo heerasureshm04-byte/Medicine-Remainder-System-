@@ -8,6 +8,8 @@ The system triggers an alarm at a predefined time (04:45 AM). Once the user ackn
 
 ---
 
+<img width="900" height="1600" alt="Image" src="https://github.com/user-attachments/assets/6a9c477a-b114-4227-b8ca-21c3194fa3c1" />
+
 ## Features
 
 - Displays current time on a 16×2 LCD.
